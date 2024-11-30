@@ -364,6 +364,9 @@ def handleLogin():
                                 }
                             }
                             data.update(new_user_tasks)
+                            tasks.seek(0)
+                            tasks.truncate()
+                            json.dump(data, tasks, indent=4)
                         break
 
         # Login
