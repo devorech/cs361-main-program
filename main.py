@@ -4,8 +4,11 @@
 import datetime
 import json
 import random
+import time
 
 TASKS_DB = "task_list.json"
+
+user_id = None      # By default the user is not logged in
 
 #
 # Prints the whitespace that "resets" the terminal (40 new lines of whitespace)
@@ -154,6 +157,70 @@ def createNewTask():
         print(f"Success! Your new task \"{new_task["name"]}\" has been created!\n")
 
 
+#
+# Calls MICROSERVICE A to compare the order and content of two differnent lists
+#    List #1: All tasks in the app
+#    List #2: Custom list of the same length of the task list array that the user will input
+#
+def compareTaskLists():
+    todo = []
+    new_task_list = []
+
+    # Check the database to get all names of tasks that are still TO-DO
+    with open(TASKS_DB, "r") as tasks:
+        data = json.load(tasks) # turns the JSON file into a python object called to
+        for t in data["tasks"]:
+            todo.append(t["name"]);
+
+    # Append the names of the to-do tasks to the file
+    print(f"Enter another set of {len(todo)} tasks below to compare their order and content similarity.")
+    print("Enter \"B\" at any time to return to the main screen.")
+    i = 1
+    while (i < len(todo) + 1):
+        t = input(f"Task {i}: ")
+        if (t == "B"):
+            printWhitespace()
+            return
+        new_task_list.append(t)
+        i = i + 1
+
+    # Place the todo list in the "prompt.txt" file in Microservice A folder
+    path = "./MicroserviceA/prompt.txt"
+    i = 1
+    with open(path, "w") as file1:
+        for t in todo:
+            if (i != len(todo)):
+                file1.write(t + ",")
+            else:
+                file1.write(t)
+            i = i + 1
+
+    # Place the new_task_list tasks in the "user_input.txt" file in Microservice A folder
+    path = "./MicroserviceA/user_input.txt"
+    i = 1
+    with open(path, "w") as file2:
+        for t in new_task_list:
+            if (i != len(new_task_list)):
+                file2.write(t + ",")
+            else:
+                file2.write(t)
+            i = i + 1
+
+    # Wait on the other microservice to process
+    printWhitespace()
+    print("Calculating simularity...")
+    time.sleep(5)
+
+    # Read the output from the microservice in the "compared_result.txt" file in Microservice A
+    # folder and output this result to the user.
+    path = "./MicroserviceA/compared_result.txt"
+    with open(path, "r") as file3:
+        result = file3.read()
+        printWhitespace()
+        print(f"{result} tasks were found in the same position.\n")
+
+
+
 # 
 # Print the details of a task, including:
 #   - name
@@ -233,27 +300,128 @@ def printHelp():
             printWhitespace()
             break
 
+#
+# MICROSERVICE B:
+# Handles the account/login manager by prompting the user for inputs, then passing this information to be 
+# used by the account services microservice.
+#
+def handleLogin():
+    COMM_PIPE = "./MicroserviceB/pipeB.txt"
+
+    print("Welcome! Use this app to keep track of tasks that need to be completed to help you be productive!")
+    print("Please enter one of the options to move forward.")
+    print("\nNote: Accounts are used to store and keep track of your tasks so you can access them at a later date!")
+    print("If this is your first time using this app, please select option #1: \"Create a new account\"")
+
+    while(True):
+        print("\nOptions:")
+        print("1. Create a new account")
+        print("2. Login to an existing account")
+
+        choice = input("\nEnter your input here: ")
+        
+        # Create a new account
+        if choice == "1":
+            printWhitespace()
+            print("Enter your new account details below. Enter \"B\" at any time to go back.")
+            username = input("New Username: ")
+            if username == "B":
+                printWhitespace()
+                continue
+            password = input("Password: ")
+            if password == "B":
+                printWhitespace()
+                continue
+            # Confirm the user wants this as their password - have them re-enter it again
+            if (password != input("Please confirm your password (re-enter password): ")):
+                printWhitespace()
+                print("Error: Passwords do not match.")
+            else:
+                # Passwords match (proceed)
+                with open(COMM_PIPE, "r+") as acctmanager:
+                    message = "create " + username + " " + password
+                    acctmanager.write(message)
+                time.sleep(1)
+
+                with open(COMM_PIPE, "r+") as acctmanager:
+                    # The result passed back will be the user's id to get their task information 
+                    # (-1 indicates an incorrect username or password -> re-prompt user to ask for id)
+                    acctmanager.seek(0)
+                    user_id = acctmanager.read()
+                    print("Id is " + user_id)
+                    if (user_id == "0"):
+                        printWhitespace()
+                        print("Error: This username already is in use.")
+                        continue
+                    else:
+                        # Continue with the main program now
+                        break
+
+        # Login
+        elif choice == "2":
+            printWhitespace()
+            print("Enter your login information below. Enter \"B\" at any time to go back.")
+
+            # Get username and passowrd (go back if the user enters "B")
+            username = input("Username: ")
+            if username == "B":
+                printWhitespace()
+                continue
+            password = input("Password: ")
+            if password == "B":
+                printWhitespace()
+                continue
+
+            # Pass this username and password off to the account manager (microservice B)
+            with open(COMM_PIPE, "r+") as acctmanager:
+                message = "login " + username + " " + password
+                acctmanager.write(message)
+            time.sleep(1)
+            with open(COMM_PIPE, "r+") as acctmanager:
+                # The result passed back will be the user's id to get their task information 
+                # (0 indicates an incorrect username or password -> re-prompt user to ask for id)
+                acctmanager.seek(0)
+                user_id = acctmanager.read()
+                if (user_id == "0"):
+                    printWhitespace()
+                    print("Error: This username or password is incorrect.")
+                    continue
+                else:
+                    # Continue with the main program now
+                    break
+
+        else:
+            print("Error: You must enter a 1 or 2.")
 
 
+#
+# Prints the user's options on the main screen.
+#
+def printUserOptions():
+    print("What would you like to do?")
+    print("1. Create a new task")
+    print("2. Mark a task as completed")
+    print("3. Delete a task")
+    print("4. Check task list similarity")
+    print("5. Help")
+    print("6. Exit program")
 
 # 
 # Where the program starts off at, and will continue until the user chooses to exit.
 #
 def main():
-    # Print the welcome message
+    # Prompt the user to login after lauching the program
     printWhitespace()
-    print("Welcome! Keep track of tasks that need to be completed to help you be productive!\n")
+    handleLogin()
+
+    # Print tasks in the to-do list, completed tasks, and finally the user's options for navigating the UI.
+    printWhitespace()
+    print("Logged in successfully!\n")
     while(True):
-        # Print tasks in the to-do list, completed tasks, and finally the user's options for navigating the UI.
         printTasks()
         
         # Print out the user's options
-        print("What would you like to do?")
-        print("1. Create a new task")
-        print("2. Mark a task as completed")
-        print("3. Delete a task")
-        print("4. Help")
-        print("5. Exit program")
+        printUserOptions()
         
         # Prompt user for input
         choice = input("Enter your input here: ")
@@ -271,10 +439,13 @@ def main():
             deleteTask()
 
         elif (choice == "4"):
+            compareTaskLists()
+
+        elif (choice == "5"):
             printHelp()
 
         # Quit the program
-        elif (choice == "5"):
+        elif (choice == "6"):
             break;
 
         # Incorrect input
