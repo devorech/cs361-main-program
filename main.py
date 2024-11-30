@@ -33,7 +33,7 @@ def deleteTask():
     # Find the task in the database
     with open(TASKS_DB, "r+") as tasks: # open with read and write
         data = json.load(tasks) # converts into a python object
-        for t in data["tasks"]:
+        for t in data[user_id]["tasks"]:
             if t["name"] == task_to_delete:
                 # Prompt the user if they are sure they want to delete this task
                 inputting = True
@@ -43,7 +43,7 @@ def deleteTask():
                     confirm = str(input("Enter your choice here: "))
                     # User confirms, delete the task and update the file
                     if (confirm == "Yes" or confirm == "Y"):
-                        data["tasks"].remove(t)
+                        data[user_id]["tasks"].remove(t)
                         # Remove the existing contents of the database first, then insert all the old + new information
                         tasks.seek(0)
                         tasks.truncate()
@@ -89,7 +89,7 @@ def completeTask():
         data = json.load(tasks) # converts into a python object
         
         # Go through the array of tasks in the database and check if the completed_task has a matching task
-        for t in data["tasks"]:
+        for t in data[user_id]["tasks"]:
             print(t["name"])
             if(t["name"] == completed_task):
                 # Update the task's completion status if found
@@ -138,14 +138,14 @@ def createNewTask():
     # Convert the database's data into a python object
     with open(TASKS_DB, mode="r+") as tasks: # read and write (don't clear file)
         data = json.load(tasks) # converts into a python object
-        for t in data["tasks"]:
+        for t in data[user_id]["tasks"]:
             if t["name"] == new_task["name"]:
                 printWhitespace()
                 print("\nError: Task already exists in the system!\n")
                 return
         
         # Append the new task to the task list if it doesn't already exist
-        data["tasks"].append(new_task)
+        data[user_id]["tasks"].append(new_task)
         
         # Remove the existing contents of the database first, then insert all the old + new information
         tasks.seek(0)
@@ -169,8 +169,8 @@ def compareTaskLists():
     # Check the database to get all names of tasks that are still TO-DO
     with open(TASKS_DB, "r") as tasks:
         data = json.load(tasks) # turns the JSON file into a python object called to
-        for t in data["tasks"]:
-            todo.append(t["name"]);
+        for t in data[user_id]["tasks"]:
+            todo.append(t["name"])  
 
     # Append the names of the to-do tasks to the file
     print(f"Enter another set of {len(todo)} tasks below to compare their order and content similarity.")
@@ -242,7 +242,7 @@ def printTasks():
     # Check the database to see what tasks are TO-DO and completed
     with open(TASKS_DB, "r") as tasks:
         data = json.load(tasks) # turns the JSON file into a python object called to
-        for t in data["tasks"]:
+        for t in data[user_id]["tasks"]:
             # Add the tasks status to the corresponding group (to-do array or completed array)
             if t["completed"] == True:
                 completed.append(t)
@@ -306,10 +306,12 @@ def printHelp():
 # used by the account services microservice.
 #
 def handleLogin():
+    global user_id  # Use the global user_id variable in this method
     COMM_PIPE = "./MicroserviceB/pipeB.txt"
 
     print("Welcome! Use this app to keep track of tasks that need to be completed to help you be productive!")
     print("Please enter one of the options to move forward.")
+
     print("\nNote: Accounts are used to store and keep track of your tasks so you can access them at a later date!")
     print("If this is your first time using this app, please select option #1: \"Create a new account\"")
 
@@ -348,13 +350,20 @@ def handleLogin():
                     # (-1 indicates an incorrect username or password -> re-prompt user to ask for id)
                     acctmanager.seek(0)
                     user_id = acctmanager.read()
-                    print("Id is " + user_id)
                     if (user_id == "0"):
                         printWhitespace()
                         print("Error: This username already is in use.")
                         continue
                     else:
-                        # Continue with the main program now
+                        # Create a new entry in the TASKS_DB file for the new account
+                        with open(TASKS_DB, "r+") as tasks: # open with read and write
+                            data = json.load(tasks) # converts into a python object
+                            new_user_tasks = {
+                                user_id: {
+                                    "tasks": []
+                                }
+                            }
+                            data.update(new_user_tasks)
                         break
 
         # Login
@@ -413,6 +422,7 @@ def main():
     # Prompt the user to login after lauching the program
     printWhitespace()
     handleLogin()
+    print(user_id)
 
     # Print tasks in the to-do list, completed tasks, and finally the user's options for navigating the UI.
     printWhitespace()
