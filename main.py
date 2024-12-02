@@ -289,6 +289,16 @@ def printHelp():
     print("   “Delete a task”: Deletes a specified task from the system. This is helpful when completed")
     print("   tasks are no longer needed for reminders and so tasks will not be stuck in the system forever.\n")
 
+    print("   “Check task list similarity”: Checks/compares the order and content of two differnent lists.")
+    print("   This is helpful to compare two To-Do lists to see how similar they are in terms of their tasks")
+    print("   and order of these tasks.\n")
+
+    print("   “Toggle Reminders On/Off”: Toggles reminders on or off, depending on what your current setting is")
+    print("   set to. This is helpful when you no longer want your screen to be cluttered with reminder messages.")
+
+    print("   “Re-arrange tasks by due date”: Re-arranges all To-Do and completed tasks and organizes them in descending")
+    print("   order (earliest date first). This is helpful to see what tasks need to be completed earliest.")
+
     print("   “Help”: Brings you to the current menu for assistance with using the app.\n")
 
     print("   “Exit program”: Exits and closes out of the program.\n")
@@ -299,6 +309,81 @@ def printHelp():
         if i == "B":
             printWhitespace()
             break
+
+#
+# Passes off the current task information to the reminder microservice (Microservice D) 
+# to print any reminders for tasks that are due today.
+#
+def printReminders():
+    COMM_PIPE = "./MicroserviceD/pipeD.txt"
+    with open(TASKS_DB, "r+") as tasks:
+        data = json.load(tasks) # converts into a python object
+        # Only print out reminders if the user has them toggled on
+        if (data[user_id]["reminders"] == True):
+            with open(COMM_PIPE, "r+") as reminders:
+                message = json.dumps(data[user_id])
+                reminders.seek(0)
+                reminders.truncate()
+                reminders.write(message)
+            time.sleep(2)
+            # Print out the reminders if any were sent over (0 = no reminders)
+            with open(COMM_PIPE, "r") as reminders:
+                res = reminders.read()
+                if res != "0":
+                    print(res)
+
+
+#
+# Toggles the user's reminders setting on/off. 
+# If the user has reminders on, the program will confirm that they want to turn them off.
+# If the user has reminders off, the program will confirm that they want to turn them on.
+#
+def toggleReminders():
+    printWhitespace()
+    toggle_to = ""  # Currently blank, but will be set to either an ON or OFF to be used for prints to the user
+    message = "You currently have reminders set to "
+
+    # Display whether users have reminders currently toggled on or off
+    with open(TASKS_DB, "r+") as tasks: 
+        data = json.load(tasks) # converts into a python object
+        if data[user_id]["reminders"] == True:
+            toggle_to = "OFF"
+            message = message + "ON."
+        else:
+            toggle_to = "ON"
+            message = message + "OFF."
+        print(message)
+
+        # Prompt the user whether they would like to toggle reminders on/off and update
+        # their information accordingly
+        while(True):
+            print("Are you sure you would like to toggle reminders " + toggle_to + "?")
+            print("Enter \"Yes\" or \"Y\" to confirm. Enter \"No\" or \"N\" to go back.")
+
+            confirm = input("\nEnter your choice here: ")
+            printWhitespace()
+            if confirm == "Yes" or confirm == "Y":
+                if (toggle_to == "ON"):
+                    print("Reminders will now be displayed.\n")
+                    data[user_id]["reminders"] = True
+                elif (toggle_to == "OFF"):
+                    print("Reminders will no longer be displayed.\n")
+                    data[user_id]["reminders"] = False
+                break
+            elif confirm == "No" or confirm == "N":
+                break
+            else:
+                print("Incorrect input.\n")
+        
+        # Update the tasks DB
+        tasks.seek(0)
+        tasks.truncate()
+        json.dump(data, tasks, indent=4)
+        
+    # Print out any reminders if the user wants them again
+    printReminders()
+
+
 
 #
 # MICROSERVICE B:
@@ -360,7 +445,8 @@ def handleLogin():
                             data = json.load(tasks) # converts into a python object
                             new_user_tasks = {
                                 user_id: {
-                                    "tasks": []
+                                    "tasks": [],
+                                    "reminders": True   # By default, reminders are toggled on
                                 }
                             }
                             data.update(new_user_tasks)
@@ -405,6 +491,29 @@ def handleLogin():
         else:
             print("Error: You must enter a 1 or 2.")
 
+#
+# MICROSERVICE C:
+# Takes the users current tasks and re-arranges them by their due date.
+#
+def rearrangeByDueDate():
+    COMM_PIPE = "./MicroserviceC/pipeC.txt"
+    with open(TASKS_DB, "r+") as tasks:
+        data = json.load(tasks) # converts into a python object
+        with open(COMM_PIPE, "r+") as rearranger:
+            message = json.dumps(data[user_id])
+            rearranger.seek(0)
+            rearranger.truncate()
+            rearranger.write(message)
+        time.sleep(2)
+        # Print out the reminders if any were sent over (0 = no reminders)
+        with open(COMM_PIPE, "r") as rearranger:
+            res = rearranger.read()
+            printWhitespace()
+            if res != "0":
+                print(res)
+            else:
+                print("You currently have no tasks that can be re-arranged.")
+            print("_" * 40 + "\n\n")
 
 #
 # Prints the user's options on the main screen.
@@ -415,21 +524,25 @@ def printUserOptions():
     print("2. Mark a task as completed")
     print("3. Delete a task")
     print("4. Check task list similarity")
-    print("5. Help")
-    print("6. Exit program")
+    print("5. Toggle Reminders On/Off")
+    print("6. Re-arrange tasks by due date")
+    print("7. Help")
+    print("8. Exit program")
 
 # 
 # Where the program starts off at, and will continue until the user chooses to exit.
 #
 def main():
-    # Prompt the user to login after lauching the program
+    # MICROSERVICE B: Prompt the user to login after lauching the program
     printWhitespace()
     handleLogin()
-    print(user_id)
-
-    # Print tasks in the to-do list, completed tasks, and finally the user's options for navigating the UI.
     printWhitespace()
     print("Logged in successfully!\n")
+
+    # MICROSERVICE D: Print any reminders for tasks due on the current day
+    printReminders()
+
+    # Print tasks in the to-do list, completed tasks, and finally the user's options for navigating the UI.
     while(True):
         printTasks()
         
@@ -451,14 +564,23 @@ def main():
         elif (choice == "3"):
             deleteTask()
 
+        # User wants to compare two task lists to see if they are the same
         elif (choice == "4"):
             compareTaskLists()
 
+        # User wants to toggle reminders on/off
         elif (choice == "5"):
+            toggleReminders()
+
+        elif (choice == "6"):
+            rearrangeByDueDate()
+
+        # User wants to get instructions for how to navigate the program
+        elif (choice == "7"):
             printHelp()
 
         # Quit the program
-        elif (choice == "6"):
+        elif (choice == "8"):
             break;
 
         # Incorrect input
