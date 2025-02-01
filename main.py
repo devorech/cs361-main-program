@@ -1,7 +1,6 @@
 # Christian DeVore
 # Main UI for To-Do/Task-management app (Sprint 1)
 
-import datetime
 import json
 import random
 import time
@@ -157,70 +156,6 @@ def createNewTask():
         print(f"Success! Your new task \"{new_task["name"]}\" has been created!\n")
 
 
-#
-# Calls MICROSERVICE A to compare the order and content of two differnent lists
-#    List #1: All tasks in the app
-#    List #2: Custom list of the same length of the task list array that the user will input
-#
-def compareTaskLists():
-    todo = []
-    new_task_list = []
-
-    # Check the database to get all names of tasks that are still TO-DO
-    with open(TASKS_DB, "r") as tasks:
-        data = json.load(tasks) # turns the JSON file into a python object called to
-        for t in data[user_id]["tasks"]:
-            todo.append(t["name"])  
-
-    # Append the names of the to-do tasks to the file
-    print(f"Enter another set of {len(todo)} tasks below to compare their order and content similarity.")
-    print("Enter \"B\" at any time to return to the main screen.")
-    i = 1
-    while (i < len(todo) + 1):
-        t = input(f"Task {i}: ")
-        if (t == "B"):
-            printWhitespace()
-            return
-        new_task_list.append(t)
-        i = i + 1
-
-    # Place the todo list in the "prompt.txt" file in Microservice A folder
-    path = "./MicroserviceA/prompt.txt"
-    i = 1
-    with open(path, "w") as file1:
-        for t in todo:
-            if (i != len(todo)):
-                file1.write(t + ",")
-            else:
-                file1.write(t)
-            i = i + 1
-
-    # Place the new_task_list tasks in the "user_input.txt" file in Microservice A folder
-    path = "./MicroserviceA/user_input.txt"
-    i = 1
-    with open(path, "w") as file2:
-        for t in new_task_list:
-            if (i != len(new_task_list)):
-                file2.write(t + ",")
-            else:
-                file2.write(t)
-            i = i + 1
-
-    # Wait on the other microservice to process
-    printWhitespace()
-    print("Calculating simularity...")
-    time.sleep(5)
-
-    # Read the output from the microservice in the "compared_result.txt" file in Microservice A
-    # folder and output this result to the user.
-    path = "./MicroserviceA/compared_result.txt"
-    with open(path, "r") as file3:
-        result = file3.read()
-        printWhitespace()
-        print(f"{result} tasks were found in the same position.\n")
-
-
-
 # 
 # Print the details of a task, including:
 #   - name
@@ -289,10 +224,6 @@ def printHelp():
     print("   “Delete a task”: Deletes a specified task from the system. This is helpful when completed")
     print("   tasks are no longer needed for reminders and so tasks will not be stuck in the system forever.\n")
 
-    print("   “Check task list similarity”: Checks/compares the order and content of two differnent lists.")
-    print("   This is helpful to compare two To-Do lists to see how similar they are in terms of their tasks")
-    print("   and order of these tasks.\n")
-
     print("   “Toggle Reminders On/Off”: Toggles reminders on or off, depending on what your current setting is")
     print("   set to. This is helpful when you no longer want your screen to be cluttered with reminder messages.")
 
@@ -311,11 +242,12 @@ def printHelp():
             break
 
 #
-# Passes off the current task information to the reminder microservice (Microservice D) 
+# MICROSERVICE C:
+# Passes off the current task information to the reminder microservice
 # to print any reminders for tasks that are due today.
 #
 def printReminders():
-    COMM_PIPE = "./MicroserviceD/pipeD.txt"
+    COMM_PIPE = "./microservice-C/pipeC.txt"
     with open(TASKS_DB, "r+") as tasks:
         data = json.load(tasks) # converts into a python object
         # Only print out reminders if the user has them toggled on
@@ -386,13 +318,13 @@ def toggleReminders():
 
 
 #
-# MICROSERVICE B:
+# MICROSERVICE A:
 # Handles the account/login manager by prompting the user for inputs, then passing this information to be 
 # used by the account services microservice.
 #
 def handleLogin():
     global user_id  # Use the global user_id variable in this method
-    COMM_PIPE = "./MicroserviceB/pipeB.txt"
+    COMM_PIPE = "./microservice-A/pipeA.txt"
 
     print("Welcome! Use this app to keep track of tasks that need to be completed to help you be productive!")
     print("Please enter one of the options to move forward.")
@@ -492,11 +424,11 @@ def handleLogin():
             print("Error: You must enter a 1 or 2.")
 
 #
-# MICROSERVICE C:
+# MICROSERVICE B:
 # Takes the users current tasks and re-arranges them by their due date.
 #
 def rearrangeByDueDate():
-    COMM_PIPE = "./MicroserviceC/pipeC.txt"
+    COMM_PIPE = "./microservice-B/pipeB.txt"
     with open(TASKS_DB, "r+") as tasks:
         data = json.load(tasks) # converts into a python object
         with open(COMM_PIPE, "r+") as rearranger:
@@ -523,11 +455,10 @@ def printUserOptions():
     print("1. Create a new task")
     print("2. Mark a task as completed")
     print("3. Delete a task")
-    print("4. Check task list similarity")
-    print("5. Toggle Reminders On/Off")
-    print("6. Re-arrange tasks by due date")
-    print("7. Help")
-    print("8. Exit program")
+    print("4. Toggle Reminders On/Off")
+    print("5. Re-arrange tasks by due date")
+    print("6. Help")
+    print("7. Exit program")
 
 # 
 # Where the program starts off at, and will continue until the user chooses to exit.
@@ -564,23 +495,20 @@ def main():
         elif (choice == "3"):
             deleteTask()
 
-        # User wants to compare two task lists to see if they are the same
-        elif (choice == "4"):
-            compareTaskLists()
-
         # User wants to toggle reminders on/off
-        elif (choice == "5"):
+        elif (choice == "4"):
             toggleReminders()
 
-        elif (choice == "6"):
+        # User wants to re-arrange their tasks
+        elif (choice == "5"):
             rearrangeByDueDate()
 
         # User wants to get instructions for how to navigate the program
-        elif (choice == "7"):
+        elif (choice == "6"):
             printHelp()
 
         # Quit the program
-        elif (choice == "8"):
+        elif (choice == "7"):
             break;
 
         # Incorrect input
